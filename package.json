@@ -1,0 +1,29 @@
+{
+  "name": "pomofocus",
+  "version": "1.1.0",
+  "description": "A pomodoro timer to boost your productivity.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "make": "electron-forge make",
+    "notarize": "node scripts/notarize.js",
+    "create-dmg": "node scripts/create-dmg.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@electron-forge/cli": "^7.6.0",
+    "@electron-forge/maker-deb": "^7.6.0",
+    "@electron-forge/maker-dmg": "^7.6.0",
+    "@electron-forge/maker-squirrel": "^7.6.0",
+    "@electron-forge/maker-zip": "^7.6.0",
+    "@electron/notarize": "^3.0.1",
+    "electron": "^33.2.1",
+    "rpmbuild": "0.0.23"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "electron-store": "^8.2.0",
+    "electron-window-state": "^5.0.3"
+  },
+  "author": "FocusLab LLC"
+}

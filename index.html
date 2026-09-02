@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <title>Pomofocus</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="mode-pomodoro">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-dot">●</span>
+        <span>Pomofocus</span>
+      </div>
+      <div class="header-actions">
+        <button id="summaryBtn" class="icon-btn" title="Summary">📊</button>
+        <button id="settingsBtn" class="icon-btn" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <main class="timer-card">
+      <nav class="tabs">
+        <button class="tab active" data-mode="pomodoro">Pomodoro</button>
+        <button class="tab" data-mode="shortBreak">Short Break</button>
+        <button class="tab" data-mode="longBreak">Long Break</button>
+      </nav>
+      <div class="progress-track">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+
+      <div id="timeDisplay" class="time-display">25:00</div>
+
+      <div class="controls">
+        <button id="startPauseBtn" class="btn-primary">START</button>
+        <button id="skipBtn" class="icon-btn skip-btn" title="Skip">⏭</button>
+      </div>
+
+      <div id="reminderStatus" class="reminder-status hidden">
+        🔔 <span id="reminderStatusText">Next reminder in 5:00</span>
+      </div>
+
+      <div class="session-info">
+        <div id="sessionNumber">#1</div>
+        <div id="sessionCaption">Time to focus!</div>
+      </div>
+    </main>
+
+    <section class="tasks-card">
+      <div class="tasks-header">
+        <h2>Tasks</h2>
+      </div>
+      <ul id="taskList" class="task-list"></ul>
+      <form id="addTaskForm" class="add-task-form">
+        <input
+          id="newTaskInput"
+          type="text"
+          placeholder="What are you working on?"
+          maxlength="200"
+        />
+        <button type="submit" class="btn-add">+ Add Task</button>
+      </form>
+    </section>
+
+    <div id="reminderToast" class="reminder-toast hidden">
+      <span id="reminderToastText">Did you start your work timer?</span>
+      <button id="reminderToastDismiss" class="toast-dismiss">✕</button>
+    </div>
+
+    <div id="adviceToast" class="advice-toast hidden">
+      <span id="adviceRarityBadge" class="advice-rarity hidden"></span>
+      <span id="adviceText" class="advice-text"></span>
+      <button id="adviceToastDismiss" class="toast-dismiss">✕</button>
+    </div>
+
+    <div id="settingsOverlay" class="overlay hidden">
+      <div class="settings-panel">
+        <div class="settings-header">
+          <h2>Settings</h2>
+          <button id="closeSettingsBtn" class="icon-btn">✕</button>
+        </div>
+
+        <div class="settings-body">
+          <section class="settings-section">
+            <h3>Timer (minutes)</h3>
+            <div class="field-row three">
+              <label
+                >Pomodoro
+                <input id="durPomodoro" type="number" min="1" max="180" />
+              </label>
+              <label
+                >Short Break
+                <input id="durShortBreak" type="number" min="1" max="60" />
+              </label>
+              <label
+                >Long Break
+                <input id="durLongBreak" type="number" min="1" max="120" />
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>Auto Start</h3>
+            <label class="field-row checkbox-row">
+              <input id="autoStartBreaks" type="checkbox" />
+              Auto start breaks
+            </label>
+            <label class="field-row checkbox-row">
+              <input id="autoStartPomodoros" type="checkbox" />
+              Auto start pomodoros
+            </label>
+            <label class="field-row">
+              Long break after
+              <input
+                id="longBreakInterval"
+                type="number"
+                min="1"
+                max="12"
+                style="width: 60px"
+              />
+              pomodoros
+            </label>
+          </section>
+
+          <section class="settings-section">
+            <h3>Overtime</h3>
+            <p class="hint">
+              When a Pomodoro hits 0:00, it rings once to let you know --
+              then keeps counting up instead of ending the session, in case
+              what you're working on is worth finishing. Press the ✓
+              button when you're actually done.
+            </p>
+          </section>
+
+          <section class="settings-section">
+            <h3>Work Start Reminder</h3>
+            <p class="hint">
+              After a break ends, ring repeatedly until you actually start
+              the next Pomodoro &mdash; so you don't accidentally work
+              untracked.
+            </p>
+            <label class="field-row checkbox-row">
+              <input id="reminderEnabled" type="checkbox" />
+              Enable reminder
+            </label>
+            <label class="field-row">
+              Ring every
+              <select id="reminderInterval">
+                <option value="3">3 minutes</option>
+                <option value="5">5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="15">15 minutes</option>
+              </select>
+            </label>
+            <label class="field-row">
+              Number of rings
+              <select id="reminderMaxRings">
+                <option value="1">1</option>
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="0">Until I turn it off</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="settings-section">
+            <h3>Sounds</h3>
+
+            <div class="volume-row">
+              <label for="masterVolume">Volume</label>
+              <input
+                type="range"
+                id="masterVolume"
+                min="0"
+                max="100"
+                value="100"
+              />
+              <span id="masterVolumeLabel" class="volume-label">100%</span>
+            </div>
+
+            <p class="hint">
+              Import your own sound for each action. Leave a slot on
+              "Default" to use the built-in sound.
+            </p>
+
+            <div class="sound-row" data-sound="start">
+              <div class="sound-row-top">
+                <span class="sound-row-label">Start</span>
+                <span class="sound-row-file">Default</span>
+              </div>
+              <div class="sound-row-actions">
+                <button type="button" class="btn-secondary sound-test-btn">▶ Test</button>
+                <button type="button" class="btn-secondary sound-choose-btn">Choose…</button>
+                <button type="button" class="btn-secondary sound-reset-btn hidden">Reset</button>
+              </div>
+            </div>
+
+            <div class="sound-row" data-sound="pause">
+              <div class="sound-row-top">
+                <span class="sound-row-label">Pause</span>
+                <span class="sound-row-file">Default</span>
+              </div>
+              <div class="sound-row-actions">
+                <button type="button" class="btn-secondary sound-test-btn">▶ Test</button>
+                <button type="button" class="btn-secondary sound-choose-btn">Choose…</button>
+                <button type="button" class="btn-secondary sound-reset-btn hidden">Reset</button>
+              </div>
+            </div>
+
+            <div class="sound-row" data-sound="skip">
+              <div class="sound-row-top">
+                <span class="sound-row-label">Skip / Fast-Forward</span>
+                <span class="sound-row-file">Default</span>
+              </div>
+              <div class="sound-row-actions">
+                <button type="button" class="btn-secondary sound-test-btn">▶ Test</button>
+                <button type="button" class="btn-secondary sound-choose-btn">Choose…</button>
+                <button type="button" class="btn-secondary sound-reset-btn hidden">Reset</button>
+              </div>
+            </div>
+
+            <div class="sound-row" data-sound="alarm">
+              <div class="sound-row-top">
+                <span class="sound-row-label">Alarm (session end)</span>
+                <span class="sound-row-file">Default</span>
+              </div>
+              <div class="sound-row-actions">
+                <button type="button" class="btn-secondary sound-test-btn">▶ Test</button>
+                <button type="button" class="btn-secondary sound-choose-btn">Choose…</button>
+                <button type="button" class="btn-secondary sound-reset-btn hidden">Reset</button>
+              </div>
+            </div>
+
+            <div class="sound-row" data-sound="reminder">
+              <div class="sound-row-top">
+                <span class="sound-row-label">Work Start Reminder</span>
+                <span class="sound-row-file">Default</span>
+              </div>
+              <div class="sound-row-actions">
+                <button type="button" class="btn-secondary sound-test-btn">▶ Test</button>
+                <button type="button" class="btn-secondary sound-choose-btn">Choose…</button>
+                <button type="button" class="btn-secondary sound-reset-btn hidden">Reset</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>Focus Log</h3>
+            <p class="hint">
+              Every completed Pomodoro is saved to a CSV file on disk, with
+              its date, start time, end time, and duration.
+            </p>
+            <button id="openLogBtn" type="button" class="btn-secondary">
+              Open Focus Log
+            </button>
+          </section>
+
+          <section class="settings-section">
+            <h3>Session Counter</h3>
+            <p class="hint">
+              The "#N" counter resets automatically at the start of each
+              day. You can also reset it manually right now.
+            </p>
+            <button id="resetSessionsBtn" type="button" class="btn-secondary">
+              Reset Today's Sessions
+            </button>
+          </section>
+        </div>
+
+        <div class="settings-footer">
+          <button id="saveSettingsBtn" class="btn-primary full-width">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="summaryOverlay" class="overlay hidden">
+      <div class="settings-panel summary-panel">
+        <div class="settings-header">
+          <h2>Today's Summary</h2>
+          <button id="closeSummaryBtn" class="icon-btn">✕</button>
+        </div>
+
+        <div class="settings-body">
+          <div id="summaryDate" class="summary-date"></div>
+
+          <div class="summary-stats">
+            <div class="summary-stat">
+              <div id="summaryPomodoros" class="summary-stat-value">0</div>
+              <div class="summary-stat-label">Pomodoros</div>
+            </div>
+            <div class="summary-stat">
+              <div id="summaryFocusTime" class="summary-stat-value">0m</div>
+              <div class="summary-stat-label">Focus Time</div>
+            </div>
+            <div class="summary-stat">
+              <div id="summaryOvertime" class="summary-stat-value">0m</div>
+              <div class="summary-stat-label">Worked Over</div>
+            </div>
+            <div class="summary-stat">
+              <div id="summaryBreakOverrun" class="summary-stat-value">0m</div>
+              <div class="summary-stat-label">Break Overrun</div>
+            </div>
+          </div>
+
+          <div class="summary-timeline-section">
+            <div class="timeline-header">
+              <h3>Today's Timeline</h3>
+              <div class="timeline-filters">
+                <button type="button" class="timeline-filter-btn active" data-range="all">All Day</button>
+                <button type="button" class="timeline-filter-btn" data-range="night">Night</button>
+                <button type="button" class="timeline-filter-btn" data-range="morning">Morning</button>
+                <button type="button" class="timeline-filter-btn" data-range="afternoon">Afternoon</button>
+                <button type="button" class="timeline-filter-btn" data-range="evening">Evening</button>
+              </div>
+            </div>
+            <div id="summaryTimeline" class="timeline-container"></div>
+          </div>
+
+          <div class="summary-breakdown">
+            <h3>Where the Time Went</h3>
+            <div class="breakdown-bar-wrap">
+              <div class="breakdown-bar">
+                <div id="breakdownFocus" class="breakdown-segment breakdown-focus"></div>
+                <div id="breakdownOvertime" class="breakdown-segment breakdown-overtime"></div>
+                <div id="breakdownShortBreak" class="breakdown-segment breakdown-shortbreak"></div>
+                <div id="breakdownLongBreak" class="breakdown-segment breakdown-longbreak"></div>
+                <div id="breakdownOverrun" class="breakdown-segment breakdown-overrun"></div>
+              </div>
+              <div id="breakdownTooltip" class="breakdown-tooltip hidden"></div>
+            </div>
+            <div class="breakdown-legend">
+              <span class="legend-item"><i class="legend-dot legend-focus"></i>Focus</span>
+              <span class="legend-item"><i class="legend-dot legend-overtime"></i>Overtime</span>
+              <span class="legend-item"><i class="legend-dot legend-shortbreak"></i>Short Break</span>
+              <span class="legend-item"><i class="legend-dot legend-longbreak"></i>Long Break</span>
+              <span class="legend-item"><i class="legend-dot legend-overrun"></i>Break Overrun</span>
+            </div>
+          </div>
+
+          <div class="summary-tasks">
+            <h3>Completed Tasks</h3>
+            <ul id="summaryTasksList" class="summary-tasks-list"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

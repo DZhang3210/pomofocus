@@ -1,0 +1,28 @@
+# dependencies / build output
+node_modules/
+out/
+dist/
+*.asar
+*.asar.bak
+
+# secrets / signing material -- never commit these
+.env
+certificates/
+
+# --- everything below this line is the installed/built Electron
+# distributable that lives in this same folder (not source code) ---
+pomofocus.exe
+pomofocus.ico
+Squirrel.exe
+LICENSES.chromium.html
+chrome_100_percent.pak
+chrome_200_percent.pak
+resources.pak
+icudtl.dat
+snapshot_blob.bin
+v8_context_snapshot.bin
+version
+vk_swiftshader_icd.json
+*.dll
+locales/
+resources/
