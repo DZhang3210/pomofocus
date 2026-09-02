@@ -16,7 +16,13 @@ const Store = require("electron-store");
 const fs = require("fs");
 const path = require("path");
 
-const ICON_PATH = path.join(__dirname, "assets", "icon.ico");
+const ICON_FILENAME =
+  process.platform === "darwin"
+    ? "icon.icns"
+    : process.platform === "win32"
+    ? "icon.ico"
+    : "icon.png";
+const ICON_PATH = path.join(__dirname, "assets", ICON_FILENAME);
 
 // Only one running copy at a time -- if the app is already running
 // (possibly hidden in the tray), a second launch just focuses that
