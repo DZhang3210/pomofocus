@@ -105,7 +105,7 @@ function getTodaySummaryFromLog() {
 
 const store = new Store({
   defaults: {
-    alwaysOnTop: true,
+    alwaysOnTop: false,
     visibleOnAllWorkspaces: false,
     settings: {
       durations: { pomodoro: 25, shortBreak: 5, longBreak: 15 },
@@ -227,7 +227,7 @@ function createWindow() {
 
   mainWindow.loadFile("index.html");
 
-  const alwaysOnTop = store.get("alwaysOnTop", true);
+  const alwaysOnTop = store.get("alwaysOnTop", false);
   const visibleOnAllWorkspaces = store.get("visibleOnAllWorkspaces", false);
 
   mainWindow.setAlwaysOnTop(alwaysOnTop, "floating");

@@ -41,6 +41,7 @@ body.mode-longBreak {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
+  -webkit-app-region: drag;
 }
 
 .brand {
@@ -60,6 +61,7 @@ body.mode-longBreak {
   display: flex;
   align-items: center;
   gap: 2px;
+  -webkit-app-region: no-drag;
 }
 
 .icon-btn {
