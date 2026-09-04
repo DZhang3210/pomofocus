@@ -2,30 +2,35 @@ require("dotenv").config({
   path: ".env",
 });
 
-console.log(process.env.APPLE_DEVELOPER_IDENTITY);
-console.log(process.env.APPLE_ID);
-console.log(process.env.APPLE_PASSWORD);
-console.log(process.env.APPLE_TEAM_ID);
+// Signing/notarizing only makes sense (and only works) when Apple Developer
+// credentials are actually configured -- e.g. for building a local, personal
+// copy of the app. Without them, osxSign still falls back to an ad-hoc
+// signature, which combined with hardenedRuntime/entitlements produces an
+// invalid signature and fails packaging outright.
+const hasAppleCredentials = Boolean(process.env.APPLE_DEVELOPER_IDENTITY);
 
 module.exports = {
   packagerConfig: {
+    name: "Pomofocus",
     icon: "./assets/icon.icns",
     asar: true,
-    osxSign: {
-      identity: process.env.APPLE_DEVELOPER_IDENTITY,
-      hardenedRuntime: true,
-      entitlements: "entitlements.plist",
-      "entitlements-inherit": "entitlements.plist",
-      "signature-flags": "library",
-    },
-    osxNotarize: {
-      tool: "notarytool",
-      notarytoolPath:
-        "/Applications/Xcode.app/Contents/Developer/usr/bin/notarytool",
-      appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_PASSWORD,
-      teamId: process.env.APPLE_TEAM_ID,
-    },
+    ...(hasAppleCredentials && {
+      osxSign: {
+        identity: process.env.APPLE_DEVELOPER_IDENTITY,
+        hardenedRuntime: true,
+        entitlements: "entitlements.plist",
+        "entitlements-inherit": "entitlements.plist",
+        "signature-flags": "library",
+      },
+      osxNotarize: {
+        tool: "notarytool",
+        notarytoolPath:
+          "/Applications/Xcode.app/Contents/Developer/usr/bin/notarytool",
+        appleId: process.env.APPLE_ID,
+        appleIdPassword: process.env.APPLE_PASSWORD,
+        teamId: process.env.APPLE_TEAM_ID,
+      },
+    }),
   },
   rebuildConfig: {},
   makers: [

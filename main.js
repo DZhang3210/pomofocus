@@ -23,6 +23,9 @@ const ICON_FILENAME =
     ? "icon.ico"
     : "icon.png";
 const ICON_PATH = path.join(__dirname, "assets", ICON_FILENAME);
+// Tray() loads its icon via nativeImage, which can't decode the .icns format
+// used for the macOS window/dock icon -- use the universally-supported PNG.
+const TRAY_ICON_PATH = path.join(__dirname, "assets", "icon.png");
 
 // Only one running copy at a time -- if the app is already running
 // (possibly hidden in the tray), a second launch just focuses that
@@ -220,7 +223,6 @@ function createWindow() {
     },
   });
 
-  mainWindow.setIcon(ICON_PATH);
   mainWindowState.manage(mainWindow);
 
   mainWindow.loadFile("index.html");
@@ -377,7 +379,7 @@ function showMainWindow() {
 
 function createTray() {
   if (tray) return;
-  tray = new Tray(ICON_PATH);
+  tray = new Tray(TRAY_ICON_PATH);
   tray.setToolTip("Pomofocus");
   tray.setContextMenu(
     Menu.buildFromTemplate([
