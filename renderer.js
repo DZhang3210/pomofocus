@@ -424,6 +424,8 @@ function getAudioCtx() {
         : 1;
     masterGainNode.connect(sharedAudioCtx.destination);
   }
+  // Chromium can suspend an idle context; wake it so sounds aren't dropped.
+  if (sharedAudioCtx.state === "suspended") sharedAudioCtx.resume();
   return sharedAudioCtx;
 }
 
@@ -506,7 +508,7 @@ function playSound(key, defaultFn) {
 // (Built-in fallback -- used only when no custom alarm sound is set.)
 function playDefaultAlarm() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
     const now = ctx.currentTime;
     const freqs = [1175, 880];
     const beepDuration = 0.11;
@@ -538,7 +540,7 @@ function playDefaultAlarm() {
 // (Built-in fallback -- used only when no custom reminder sound is set.)
 function playDefaultReminderBeep() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
     const now = ctx.currentTime;
     [0, 0.15, 0.3].forEach((offset) => {
       const o = ctx.createOscillator();
@@ -572,7 +574,7 @@ function createNoiseBuffer(ctx, duration) {
 
 function playTactileClick(pitch) {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
     const now = ctx.currentTime;
 
     const noise = ctx.createBufferSource();
