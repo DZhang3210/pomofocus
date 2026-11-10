@@ -846,7 +846,58 @@ settingsBtn.addEventListener("click", () => {
   masterVolumeInput.value = volPct;
   masterVolumeLabel.textContent = `${volPct}%`;
   refreshSoundRows();
+  loadSyncFields();
   settingsOverlay.classList.remove("hidden");
+});
+
+// --- Sync settings ---
+const syncField = (id) => document.getElementById(id);
+
+async function loadSyncFields() {
+  const c = await ipcRenderer.invoke("sync:get-config");
+  syncField("syncEnabled").checked = c.enabled;
+  syncField("syncBucket").value = c.bucket;
+  syncField("syncRegion").value = c.region;
+  syncField("syncAccessKeyId").value = c.accessKeyId;
+  syncField("syncSecret").value = "";
+  syncField("syncSecret").placeholder = c.hasSecret ? "Saved — leave blank to keep" : "";
+  syncField("syncDeviceName").value = c.deviceName;
+  syncField("syncEndpoint").value = c.endpoint;
+  setSyncStatus("");
+}
+
+function readSyncFields() {
+  return {
+    enabled: syncField("syncEnabled").checked,
+    bucket: syncField("syncBucket").value,
+    region: syncField("syncRegion").value,
+    accessKeyId: syncField("syncAccessKeyId").value,
+    secretAccessKey: syncField("syncSecret").value,
+    deviceName: syncField("syncDeviceName").value,
+    endpoint: syncField("syncEndpoint").value,
+  };
+}
+
+function setSyncStatus(text, kind) {
+  const el = syncField("syncStatus");
+  el.textContent = text;
+  el.className = `sync-status${kind ? ` ${kind}` : ""}`;
+}
+
+syncField("syncTestBtn").addEventListener("click", async () => {
+  setSyncStatus("Testing…");
+  const result = await ipcRenderer.invoke("sync:test", readSyncFields());
+  if (result.ok) {
+    const others = result.otherDevices;
+    setSyncStatus(
+      others.length
+        ? `Connected · also found ${others.join(", ")} today`
+        : "Connected · no other devices yet today",
+      "ok"
+    );
+  } else {
+    setSyncStatus(result.error, "error");
+  }
 });
 
 closeSettingsBtn.addEventListener("click", () =>
@@ -899,6 +950,7 @@ saveSettingsBtn.addEventListener("click", () => {
   );
 
   ipcRenderer.send("store:set", "settings", settings);
+  ipcRenderer.invoke("sync:save-config", readSyncFields());
   settingsOverlay.classList.add("hidden");
 
   if (!running) {
@@ -1226,6 +1278,30 @@ document.querySelectorAll(".breakdown-segment").forEach((seg) => {
   seg.addEventListener("mouseleave", hideBreakdownTooltip);
 });
 
+// One line under the date saying which devices today's totals include.
+function renderSyncNote(sync) {
+  const el = document.getElementById("summarySyncNote");
+  el.classList.remove("error");
+  if (!sync || sync.state === "off") {
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  if (sync.state === "error") {
+    el.classList.add("error");
+    el.textContent = `Showing this device only — couldn't sync: ${sync.error}`;
+    return;
+  }
+  const active = sync.devices.filter((d) => d.count > 0 || d.isThisDevice);
+  el.textContent =
+    active.length <= 1
+      ? "Synced · no sessions from other devices yet today"
+      : "All devices: " +
+        active
+          .map((d) => `${d.name}${d.isThisDevice ? " (this one)" : ""} ${d.count}`)
+          .join(" · ");
+}
+
 async function openSummary() {
   const logSummary = await ipcRenderer.invoke("log:get-today-summary");
   const doneTasks = tasks.filter((t) => t.done);
@@ -1241,6 +1317,7 @@ async function openSummary() {
   // source of truth and stay consistent with each other. completedPomodoros
   // also counts skipped/abandoned sessions, which aren't real completions.
   summaryPomodorosEl.textContent = String(logSummary.count);
+  renderSyncNote(logSummary.sync);
 
   const overtimeMinutes = overtimeSecondsToday / 60;
   const overrunMinutes = breakOverrunSecondsToday / 60;

@@ -10,6 +10,7 @@ const {
   shell,
   dialog,
   Tray,
+  safeStorage,
 } = require("electron");
 
 // The Windows installer (Squirrel) launches the app with --squirrel-* flags
@@ -21,6 +22,7 @@ if (require("electron-squirrel-startup")) {
 }
 
 const { initUpdater, checkForUpdatesManually } = require("./updater");
+const { CloudSync, mergeSummaries, todayKey } = require("./cloud-sync");
 const windowStateKeeper = require("electron-window-state");
 const Store = require("electron-store");
 const fs = require("fs");
@@ -142,6 +144,56 @@ const store = new Store({
     tasks: [],
   },
 });
+
+// --- Cross-device sync (S3) ---
+// Created once the app is ready, since safeStorage needs that. The AWS
+// secret key is encrypted with the OS keychain/DPAPI before it's stored.
+let cloudSync = null;
+const SYNC_RETRY_MS = 15 * 60 * 1000;
+
+function initCloudSync() {
+  cloudSync = new CloudSync({
+    store,
+    encrypt: (text) =>
+      safeStorage.isEncryptionAvailable()
+        ? `os:${safeStorage.encryptString(text).toString("base64")}`
+        : `plain:${Buffer.from(text).toString("base64")}`,
+    decrypt: (stored) => {
+      const [kind, data] = String(stored).split(":");
+      const buf = Buffer.from(data || "", "base64");
+      return kind === "os" ? safeStorage.decryptString(buf) : buf.toString();
+    },
+  });
+  // Catch up on any upload that failed while offline.
+  const catchUp = () => {
+    if (cloudSync.isEnabled()) pushTodayToCloud();
+  };
+  setTimeout(catchUp, 5000);
+  setInterval(catchUp, SYNC_RETRY_MS);
+}
+
+// Upload this device's sessions for today; failures are retried later.
+function pushTodayToCloud() {
+  if (!cloudSync || !cloudSync.isEnabled()) return;
+  const local = getTodaySummaryFromLog();
+  cloudSync
+    .uploadDay(todayKey(), local.sessions)
+    .then(() => (cloudSync.lastError = null))
+    .catch((err) => {
+      cloudSync.lastError = err.message;
+      console.error("Cloud sync upload failed:", err.message);
+    });
+}
+
+// Today's totals: this device's log, plus every other device's when sync is on.
+async function getTodaySummaryAllDevices() {
+  const local = getTodaySummaryFromLog();
+  if (!cloudSync || !cloudSync.isEnabled()) return { ...local, sync: { state: "off" } };
+  const result = await cloudSync.syncToday(local.sessions);
+  if (!result.ok) return { ...local, sync: { state: "error", error: result.error } };
+  const merged = mergeSummaries(local, result.others, cloudSync.deviceName);
+  return { ...merged, sync: { state: "ok", devices: merged.devices } };
+}
 
 // --- Work Start Reminder ---
 // Armed when a break ends. Pings on a repeating interval until the next
@@ -368,12 +420,30 @@ function createWindow() {
     } catch (err) {
       console.error("Failed to write focus log:", err);
     }
+    pushTodayToCloud();
   });
   ipcMain.on("log:open", () => {
     ensureLogFile();
     shell.showItemInFolder(LOG_FILE);
   });
-  ipcMain.handle("log:get-today-summary", () => getTodaySummaryFromLog());
+  ipcMain.handle("log:get-today-summary", () => getTodaySummaryAllDevices());
+
+  // --- IPC: cross-device sync settings ---
+  ipcMain.handle("sync:get-config", () => cloudSync.getPublicConfig());
+  ipcMain.handle("sync:save-config", (event, config) => {
+    cloudSync.saveConfig(config);
+    pushTodayToCloud();
+    return cloudSync.getPublicConfig();
+  });
+  // Tests the values currently in the form (saved or not) by doing a real
+  // upload, list and read of today's data.
+  ipcMain.handle("sync:test", async (event, form) => {
+    const local = getTodaySummaryFromLog();
+    const result = await cloudSync.syncToday(local.sessions, form);
+    return result.ok
+      ? { ok: true, otherDevices: result.others.map((o) => o.deviceName) }
+      : { ok: false, error: result.error };
+  });
 
   // --- IPC: custom sound file picker ---
   ipcMain.handle("sound:choose-file", async () => {
@@ -432,6 +502,7 @@ app.on("before-quit-for-update", () => {
 
 if (gotSingleInstanceLock) {
   app.whenReady().then(() => {
+    initCloudSync();
     createWindow();
     initUpdater({
       onBeforeRestart: () => {

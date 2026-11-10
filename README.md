@@ -49,6 +49,40 @@ npm run make
 
 This uses [Electron Forge](https://www.electronforge.io/) to produce a platform-specific installer in `out/make/`. Building for macOS requires additional steps for notarization (Apple Developer credentials in a local `.env` file, which is gitignored — see `DISTRIBUTION_MANUAL.md` for the full platform-by-platform build and distribution process, including Windows and Linux).
 
+## Syncing Across Devices (Amazon S3)
+
+Optional. When it's on, **Today's Summary** adds up focus time from every device that uses the same bucket. Each device uploads its own file for the day (`pomofocus/days/<date>/<device-id>.json`) after every completed Pomodoro, so devices never overwrite each other. The local CSV log stays the source of truth; if a device is offline, it uploads the next time it can (it retries every 15 minutes).
+
+### One-time AWS setup
+
+1. **Create a bucket.** In the [S3 console](https://console.aws.amazon.com/s3/), click **Create bucket**, pick a name (e.g. `yourname-pomofocus`) and a region, and leave **Block all public access** turned on.
+2. **Create a key that can only touch that bucket.** In the [IAM console](https://console.aws.amazon.com/iam/), go to **Users → Create user**, name it `pomofocus-sync`, and don't give it console access. On the permissions step choose **Attach policies directly → Create policy**, switch to **JSON**, and paste this (replace `YOUR-BUCKET` twice):
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": "s3:ListBucket",
+         "Resource": "arn:aws:s3:::YOUR-BUCKET",
+         "Condition": { "StringLike": { "s3:prefix": "pomofocus/*" } }
+       },
+       {
+         "Effect": "Allow",
+         "Action": ["s3:GetObject", "s3:PutObject"],
+         "Resource": "arn:aws:s3:::YOUR-BUCKET/pomofocus/*"
+       }
+     ]
+   }
+   ```
+
+   Name the policy `pomofocus-sync`, attach it to the user, and finish.
+3. **Make an access key.** Open the user → **Security credentials → Create access key** → choose **Application running outside AWS**. Copy the **Access key ID** and **Secret access key** (the secret is only shown once).
+4. **On each device:** open **Settings → Sync Across Devices**, turn it on, enter the bucket, region, access key ID and secret, give the device a name, click **Test Connection**, then **Save**.
+
+Cost: a handful of tiny requests per Pomodoro, which comes to well under a cent a month. The secret key is encrypted on each device with the OS keychain (macOS) or Windows' data protection.
+
 ## Releasing an Update
 
 Pushing a version tag makes GitHub build the Windows installer and both macOS apps (Apple Silicon and Intel) and publish them on the [Releases page](https://github.com/DZhang3210/pomofocus/releases). Installed copies check for updates on launch and every 6 hours, or on demand via **Help → Check for Updates…**.

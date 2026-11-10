@@ -502,6 +502,62 @@ body.mode-longBreak {
 .checkbox-row {
   cursor: pointer;
 }
+
+/* --- Sync Across Devices --- */
+.sync-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sync-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #555;
+}
+.sync-fields input {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.sync-fields .optional {
+  color: #999;
+}
+.sync-test-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sync-status {
+  font-size: 12px;
+  color: #777;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sync-status.ok {
+  color: #2e7d32;
+}
+.sync-status.error {
+  color: #c62828;
+}
+.summary-sync-note {
+  font-size: 12px;
+  color: #777;
+  margin: -4px 0 12px;
+}
+.summary-sync-note.error {
+  color: #c62828;
+}
+.summary-sync-note.hidden {
+  display: none;
+}
 .checkbox-row input {
   width: 16px;
   height: 16px;

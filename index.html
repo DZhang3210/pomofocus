@@ -259,6 +259,43 @@
           </section>
 
           <section class="settings-section">
+            <h3>Sync Across Devices</h3>
+            <p class="hint">
+              Combines today's focus time from all your devices using your
+              own Amazon S3 bucket. Use the same bucket and key on each
+              device. The secret key is encrypted on this computer.
+            </p>
+            <label class="field-row checkbox-row">
+              <input id="syncEnabled" type="checkbox" />
+              Sync with Amazon S3
+            </label>
+            <div class="sync-fields">
+              <label>Bucket
+                <input id="syncBucket" type="text" spellcheck="false" placeholder="my-pomofocus-bucket" />
+              </label>
+              <label>Region
+                <input id="syncRegion" type="text" spellcheck="false" placeholder="us-east-1" />
+              </label>
+              <label>Access key ID
+                <input id="syncAccessKeyId" type="text" spellcheck="false" autocomplete="off" />
+              </label>
+              <label>Secret access key
+                <input id="syncSecret" type="password" autocomplete="off" />
+              </label>
+              <label>This device's name
+                <input id="syncDeviceName" type="text" spellcheck="false" />
+              </label>
+              <label>Custom endpoint <span class="optional">(optional, for S3-compatible services)</span>
+                <input id="syncEndpoint" type="text" spellcheck="false" placeholder="Leave blank for Amazon S3" />
+              </label>
+            </div>
+            <div class="sync-test-row">
+              <button id="syncTestBtn" type="button" class="btn-secondary">Test Connection</button>
+              <span id="syncStatus" class="sync-status"></span>
+            </div>
+          </section>
+
+          <section class="settings-section">
             <h3>Session Counter</h3>
             <p class="hint">
               The "#N" counter resets automatically at the start of each
@@ -287,6 +324,7 @@
 
         <div class="settings-body">
           <div id="summaryDate" class="summary-date"></div>
+          <div id="summarySyncNote" class="summary-sync-note hidden"></div>
 
           <div class="summary-stats">
             <div class="summary-stat">
