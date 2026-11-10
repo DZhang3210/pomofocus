@@ -49,6 +49,22 @@ npm run make
 
 This uses [Electron Forge](https://www.electronforge.io/) to produce a platform-specific installer in `out/make/`. Building for macOS requires additional steps for notarization (Apple Developer credentials in a local `.env` file, which is gitignored — see `DISTRIBUTION_MANUAL.md` for the full platform-by-platform build and distribution process, including Windows and Linux).
 
+## Releasing an Update
+
+Pushing a version tag makes GitHub build the Windows installer and both macOS apps (Apple Silicon and Intel) and publish them on the [Releases page](https://github.com/DZhang3210/pomofocus/releases). Installed copies check for updates on launch and every 6 hours, or on demand via **Help → Check for Updates…**.
+
+```bash
+npm version patch        # or minor / major: bumps package.json and creates a vX.Y.Z tag
+git push --follow-tags   # pushes the commit and the tag; the Release workflow does the rest
+```
+
+The tag must match the version in `package.json`, or the build stops.
+
+### Installing on a new device (one time)
+
+- **Windows:** download `Pomofocus-Setup.exe` and run it. Windows may say it "protected your PC" because the app isn't signed: click **More info → Run anyway**. Updates then install automatically.
+- **macOS:** download `Pomofocus-darwin-arm64-….zip` (Apple Silicon) or `Pomofocus-darwin-x64-….zip` (Intel), unzip it, and drag **Pomofocus** into **Applications**. The first time you open it, macOS blocks it because it isn't signed with a paid Apple Developer ID: go to **System Settings → Privacy & Security** and click **Open Anyway**. After that, Pomofocus downloads updates from the Releases page itself, checks each one's SHA-256 checksum, and replaces itself. If macOS stops it from doing that, allow Pomofocus under **Privacy & Security → App Management**.
+
 ## License
 
 MIT

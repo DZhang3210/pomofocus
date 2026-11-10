@@ -9,11 +9,32 @@ require("dotenv").config({
 // invalid signature and fails packaging outright.
 const hasAppleCredentials = Boolean(process.env.APPLE_DEVELOPER_IDENTITY);
 
+const { execFileSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
 module.exports = {
+  hooks: {
+    // Apple Silicon Macs refuse to run code with no signature at all. Without
+    // a paid Developer ID, give the app a free "ad-hoc" signature instead.
+    postPackage: async (_config, { platform, outputPaths }) => {
+      if (platform !== "darwin" || hasAppleCredentials) return;
+      for (const outDir of outputPaths) {
+        for (const name of fs.readdirSync(outDir).filter((n) => n.endsWith(".app"))) {
+          execFileSync("codesign", ["--force", "--deep", "--sign", "-", path.join(outDir, name)], {
+            stdio: "inherit",
+          });
+        }
+      }
+    },
+  },
   packagerConfig: {
     name: "Pomofocus",
-    icon: "./assets/icon.icns",
+    // No extension: the packager picks icon.icns on macOS and icon.ico on Windows.
+    icon: "./assets/icon",
     asar: true,
+    // Personal sound files picked in the app's settings stay on this machine.
+    ignore: [/^\/assets\/sounds\/custom(\/|$)/, /^\/\.github(\/|$)/],
     ...(hasAppleCredentials && {
       osxSign: {
         identity: process.env.APPLE_DEVELOPER_IDENTITY,
@@ -43,7 +64,6 @@ module.exports = {
         setupExe: "Pomofocus-Setup.exe",
         description:
           "Productivity tool for time management using Pomodoro Technique",
-        arch: ["x64", "ia32"],
       },
     },
     // {

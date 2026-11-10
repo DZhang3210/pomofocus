@@ -11,6 +11,16 @@ const {
   dialog,
   Tray,
 } = require("electron");
+
+// The Windows installer (Squirrel) launches the app with --squirrel-* flags
+// to create/remove shortcuts during install, update and uninstall. Handle
+// those and exit right away instead of opening the app mid-install.
+if (require("electron-squirrel-startup")) {
+  app.quit();
+  return;
+}
+
+const { initUpdater, checkForUpdatesManually } = require("./updater");
 const windowStateKeeper = require("electron-window-state");
 const Store = require("electron-store");
 const fs = require("fs");
@@ -303,6 +313,15 @@ function createWindow() {
       ],
     },
     { role: "windowMenu" },
+    {
+      role: "help",
+      submenu: [
+        {
+          label: "Check for Updates…",
+          click: () => checkForUpdatesManually(),
+        },
+      ],
+    },
   ]);
 
   Menu.setApplicationMenu(defaultMenu);
@@ -405,9 +424,20 @@ app.on("before-quit", () => {
   isQuitting = true;
 });
 
+// Restarting to install a Windows update closes windows before
+// "before-quit" fires, so the hide-on-close handler must be off first.
+app.on("before-quit-for-update", () => {
+  isQuitting = true;
+});
+
 if (gotSingleInstanceLock) {
   app.whenReady().then(() => {
     createWindow();
+    initUpdater({
+      onBeforeRestart: () => {
+        isQuitting = true;
+      },
+    });
 
     app.on("activate", function () {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
