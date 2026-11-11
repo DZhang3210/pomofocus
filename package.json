@@ -1,6 +1,6 @@
 {
   "name": "pomofocus",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "A pomodoro timer to boost your productivity.",
   "main": "main.js",
   "scripts": {
