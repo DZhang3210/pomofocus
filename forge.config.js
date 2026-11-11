@@ -61,6 +61,10 @@ module.exports = {
         name: "Pomofocus",
         authors: "FocusLab LLC",
         setupIcon: "./assets/icon.ico",
+        // Icon for the installed-apps list (Squirrel saves it as app.ico).
+        // Must be a URL; without it Squirrel uses Electron's default icon.
+        iconUrl:
+          "https://raw.githubusercontent.com/DZhang3210/pomofocus/main/assets/icon.ico",
         setupExe: "Pomofocus-Setup.exe",
         description:
           "Productivity tool for time management using Pomodoro Technique",
