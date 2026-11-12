@@ -115,7 +115,10 @@ async function init() {
     settings.masterVolume = 1;
   }
 
+  // Read the saved timer before resetTimerForMode() overwrites it.
+  const savedTimer = await ipcRenderer.invoke("store:get", "timerState");
   resetTimerForMode("pomodoro");
+  restoreTimerState(savedTimer);
   renderTasks();
   refreshSoundRows();
   loadBundledDefaultSounds();
@@ -173,6 +176,8 @@ function resetTimerForMode(m) {
   inOvertime = false;
   overtimeSeconds = 0;
   clearInterval(tickInterval);
+  ipcRenderer.send("timer:running", false);
+  if (settings) saveTimerState();
   document.body.className = "mode-" + m;
   tabs.forEach((t) => t.classList.toggle("active", t.dataset.mode === m));
 
@@ -230,14 +235,34 @@ function render() {
   skipBtn.title = inOvertime ? "Finish & take a break" : "Skip";
 }
 
+// --- Clock-based timing ---
+// The countdown is worked out from the real clock, not by counting ticks:
+// if ticks are delayed (window hidden, Mac asleep, App Nap) the timer still
+// shows the right time on the next tick instead of falling behind.
+let clockStartedAt = 0; // when the current running stretch started (ms)
+let remainingAtClockStart = 0;
+let overtimeAtClockStart = 0;
+let lastSavedAt = 0;
+const SAVE_EVERY_MS = 10 * 1000;
+
+function startClock(fromTime = Date.now()) {
+  clockStartedAt = fromTime;
+  remainingAtClockStart = remaining;
+  overtimeAtClockStart = overtimeSeconds;
+}
+
 function tick() {
+  const elapsed = Math.max(0, Math.floor((Date.now() - clockStartedAt) / 1000));
+  if (Date.now() - lastSavedAt >= SAVE_EVERY_MS) saveTimerState();
   if (inOvertime) {
-    overtimeSeconds++;
+    overtimeSeconds = overtimeAtClockStart + elapsed;
     render();
     return;
   }
-  remaining--;
+  remaining = remainingAtClockStart - elapsed;
   if (remaining <= 0) {
+    // Time spent past zero (e.g. the Mac was asleep) counts as overtime.
+    const pastZero = -remaining;
     if (mode === "pomodoro") {
       // Nominal work time is up -- ring once as the "time's up" signal
       // (that part still matters), but don't force the session to end.
@@ -251,14 +276,58 @@ function tick() {
       playAlarm();
       inOvertime = true;
       remaining = 0;
+      overtimeSeconds = pastZero;
+      startClock(Date.now() - pastZero * 1000);
+      overtimeAtClockStart = 0;
+      saveTimerState();
       render();
       return;
     }
+    remaining = 0;
     completeSession(false);
   } else {
     render();
   }
 }
+
+// --- Saving the timer so a restart doesn't lose the session ---
+function saveTimerState(sync = false) {
+  lastSavedAt = Date.now();
+  const state = {
+    date: todayKey(),
+    savedAt: lastSavedAt,
+    mode,
+    remaining,
+    running,
+    inOvertime,
+    overtimeSeconds,
+    pomodoroStartedAt,
+  };
+  if (sync) ipcRenderer.sendSync("store:set-sync", "timerState", state);
+  else ipcRenderer.send("store:set", "timerState", state);
+}
+
+// Picks up where the last run left off (today only). A timer that was
+// running keeps counting the time the app was closed.
+function restoreTimerState(saved) {
+  if (!saved || saved.date !== todayKey() || !settings.durations[saved.mode]) return;
+  resetTimerForMode(saved.mode);
+  remaining = Math.max(0, Math.min(saved.remaining, totalSecondsFor(saved.mode)));
+  inOvertime = Boolean(saved.inOvertime) && saved.mode === "pomodoro";
+  overtimeSeconds = Math.max(0, saved.overtimeSeconds || 0);
+  pomodoroStartedAt = saved.pomodoroStartedAt || null;
+  if (saved.running) {
+    running = true;
+    startClock(Math.min(saved.savedAt, Date.now()));
+    ipcRenderer.send("timer:running", true);
+    tickInterval = setInterval(tick, 1000);
+    tick();
+  }
+  saveTimerState();
+  render();
+}
+
+window.addEventListener("beforeunload", () => saveTimerState(true));
 
 function start() {
   if (running) return;
@@ -279,7 +348,10 @@ function start() {
       lastBreakEndedAt = null;
     }
   }
+  startClock();
   tickInterval = setInterval(tick, 1000);
+  ipcRenderer.send("timer:running", true);
+  saveTimerState();
   if (mode === "pomodoro") {
     ipcRenderer.send("reminder:disarm");
     reminderToast.classList.add("hidden");
@@ -289,8 +361,11 @@ function start() {
 }
 
 function pause() {
+  if (running) tick(); // bring the countdown up to date before stopping
   running = false;
   clearInterval(tickInterval);
+  ipcRenderer.send("timer:running", false);
+  saveTimerState();
   render();
 }
 

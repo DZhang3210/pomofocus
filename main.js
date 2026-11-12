@@ -11,6 +11,9 @@ const {
   dialog,
   Tray,
   safeStorage,
+  nativeImage,
+  powerSaveBlocker,
+  screen,
 } = require("electron");
 
 // The Windows installer (Squirrel) launches the app with --squirrel-* flags
@@ -282,6 +285,9 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      // The timer lives in this window and must keep running at full speed
+      // while the window is hidden.
+      backgroundThrottling: false,
     },
   });
 
@@ -384,8 +390,24 @@ function createWindow() {
   // so the timer keeps running in the background and nothing resets.
   // The only way to actually quit is via the tray menu's "Quit".
   mainWindow.on("close", (event) => {
-    if (!isQuitting) {
-      event.preventDefault();
+    if (isQuitting) return;
+    event.preventDefault();
+    // On macOS, hiding a full-screen window leaves it stuck in an empty
+    // full-screen Space that can't be brought back -- leave full screen first.
+    if (mainWindow.isFullScreen()) {
+      const win = mainWindow;
+      let done = false;
+      const hideOnce = () => {
+        if (done || win.isDestroyed()) return;
+        done = true;
+        win.hide();
+      };
+      // Hide once the exit animation finishes; the timer is a fallback in
+      // case the event never arrives (it doesn't on Windows).
+      win.once("leave-full-screen", () => setTimeout(hideOnce, 100));
+      setTimeout(hideOnce, 1500);
+      win.setFullScreen(false);
+    } else {
       mainWindow.hide();
     }
   });
@@ -397,10 +419,22 @@ function createWindow() {
   });
 
   createTray();
+}
 
+// IPC handlers are registered once for the app's lifetime. (Registering
+// them inside createWindow would throw if a window were ever re-created.)
+function registerIpc() {
   // --- IPC: state persistence ---
   ipcMain.handle("store:get", (event, key) => store.get(key));
   ipcMain.on("store:set", (event, key, value) => store.set(key, value));
+  // Synchronous variant for saving the timer while the window is unloading.
+  ipcMain.on("store:set-sync", (event, key, value) => {
+    store.set(key, value);
+    event.returnValue = true;
+  });
+
+  // --- IPC: keep macOS App Nap from pausing a running timer ---
+  ipcMain.on("timer:running", (event, isRunning) => setKeepAwake(isRunning));
 
   // --- IPC: OS notifications ---
   ipcMain.on("notify", (event, { title, body }) => {
@@ -459,16 +493,50 @@ function createWindow() {
   });
 }
 
+let keepAwakeId = null;
+function setKeepAwake(on) {
+  if (on && keepAwakeId === null) {
+    keepAwakeId = powerSaveBlocker.start("prevent-app-suspension");
+  } else if (!on && keepAwakeId !== null) {
+    powerSaveBlocker.stop(keepAwakeId);
+    keepAwakeId = null;
+  }
+}
+
+// If the window ended up somewhere no screen covers (e.g. an unplugged
+// monitor), move it back to the middle of the main screen.
+function ensureOnScreen(win) {
+  const b = win.getBounds();
+  const visible = screen.getAllDisplays().some(({ workArea: a }) => {
+    const overlapX = Math.min(b.x + b.width, a.x + a.width) - Math.max(b.x, a.x);
+    const overlapY = Math.min(b.y + b.height, a.y + a.height) - Math.max(b.y, a.y);
+    return overlapX >= 50 && overlapY >= 50;
+  });
+  if (!visible) win.center();
+}
+
 function showMainWindow() {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
   if (mainWindow.isMinimized()) mainWindow.restore();
+  ensureOnScreen(mainWindow);
   mainWindow.show();
+  if (process.platform === "darwin") app.focus({ steal: true });
   mainWindow.focus();
+}
+
+// Tray/menu-bar icon. macOS draws it at its real pixel size, so the
+// 256px app icon must be shrunk or it's too wide to show at all.
+function trayIcon() {
+  const img = nativeImage.createFromPath(TRAY_ICON_PATH);
+  return process.platform === "darwin" ? img.resize({ width: 18, height: 18, quality: "best" }) : img;
 }
 
 function createTray() {
   if (tray) return;
-  tray = new Tray(TRAY_ICON_PATH);
+  tray = new Tray(trayIcon());
   tray.setToolTip("Pomofocus");
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -503,6 +571,7 @@ app.on("before-quit-for-update", () => {
 if (gotSingleInstanceLock) {
   app.whenReady().then(() => {
     initCloudSync();
+    registerIpc();
     createWindow();
     initUpdater({
       onBeforeRestart: () => {
@@ -510,9 +579,14 @@ if (gotSingleInstanceLock) {
       },
     });
 
-    app.on("activate", function () {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    });
+    // macOS: clicking the Dock icon, or opening the app again from
+    // Applications/Spotlight, fires "activate". The window is usually just
+    // hidden (closing hides it), so show it rather than only handling the
+    // no-window case -- otherwise it can't be brought back.
+    app.on("activate", showMainWindow);
+    if (process.platform === "darwin" && app.dock) {
+      app.dock.setMenu(Menu.buildFromTemplate([{ label: "Show Pomofocus", click: showMainWindow }]));
+    }
   });
 
   app.on("window-all-closed", function () {
